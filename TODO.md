@@ -1,0 +1,21 @@
+# TODO
+
+- Documentation
+- Automatically create FSM from table
+- Add testing code
+- Other forms of static analysis
+  - functions per file
+  - lines per file
+  - global variables per file
+  - static variables per file
+  - parameters per function
+  - local variables per function
+  - static variables per function
+  - global references per function
+  - lines per function
+  - for/while/do/switch/if per function
+  - assignments per function
+  - max nesting depth 
+  - variable name length
+  - line length
+  - comments per function, file
