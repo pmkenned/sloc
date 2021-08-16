@@ -32,7 +32,7 @@ int     parse_options(int argc, char * argv[], option_t * options, size_t num_op
 char *  gen_options_str(option_t * options, size_t num_options);
 
 #ifdef TEST
-int test_parse_options();
+char * test_parse_options();
 #endif
 
 #ifdef __cplusplus

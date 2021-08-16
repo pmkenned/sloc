@@ -97,6 +97,8 @@ gen_options_str(option_t * options, size_t num_options)
     size_t i, j;
     size_t cap = 1; /* \0 */
     char * s, * s_end;
+    if (num_options == 0)
+        return NULL;
     for (i = 0; i < num_options; i++)
         max_long_opt_len = MAX(strlen(options[i].long_opt), max_long_opt_len);
     size_t desc_offset = max_long_opt_len + 12;
@@ -125,32 +127,62 @@ gen_options_str(option_t * options, size_t num_options)
 
 #ifdef TEST
 
-static int
-rejects_any_arg_beginning_with_dash(option_t * options)
+#include "minunit.h"
+
+static char *
+test_parse_options__with_an_empty_options_list_any_arg_beginning_with_dash_is_rejected()
 {
+    option_t * options = NULL;
     char ** non_option_args;
     size_t num_non_option_args;
 
     char * argv[] = {"program", "-foo", NULL};
     size_t argc = NELEM(argv) - 1;
 
-    return -1 == parse_options(argc, argv, options, 0, &non_option_args, &num_non_option_args);
+    mu_assert(-1 == parse_options(argc, argv, options, 0, &non_option_args, &num_non_option_args), "with an empty options list, any arg beginning with dash is rejected");
+
+    return NULL;
 }
 
-int
+static char *
+test_parse_options__with_an_empty_options_list_non_option_args_are_returned()
+{
+    size_t i;
+    option_t * options = NULL;
+    char ** non_option_args;
+    size_t num_non_option_args;
+
+    char * argv[] = {"program", "foo", "bar", NULL};
+    size_t argc = NELEM(argv) - 1;
+
+    parse_options(argc, argv, options, 0, &non_option_args, &num_non_option_args);
+
+    mu_assert(num_non_option_args == argc-1, "with an empty options list, number of non-option arguments is argc-1");
+
+    for (i = 1; i < argc-1; i++)
+        mu_assert(strcmp(non_option_args[i], argv[i+1]) == 0, "with an empty options list, non-option args are returned");
+
+    return NULL;
+}
+
+static char *
+test_gen_options_str__with_no_options_str_is_null()
+{
+    mu_assert(gen_options_str(NULL, 0) == NULL, "with no options, string is null ptr");
+    return NULL;
+}
+
+char *
 test_parse_options()
 {
-    option_t * an_empty_options_list = NULL;
+    // parse_options
+    mu_run_test(test_parse_options__with_an_empty_options_list_any_arg_beginning_with_dash_is_rejected);
+    mu_run_test(test_parse_options__with_an_empty_options_list_non_option_args_are_returned);
 
-    assert(rejects_any_arg_beginning_with_dash(an_empty_options_list));
+    // gen_options_str
+    mu_run_test(test_gen_options_str__with_no_options_str_is_null);
 
-    // an empty options list
-    //  rejects any argument beginning with '-'
-    //  sets num_non_option_args to argc-1
-    //  sets non_option_args to an allocation of 'argc' 'char *'s
-    //  sets contents of non_option_args array equal to contents of array pointed to by argv+1
-    //
-    // TODO
-    return 1;
+    return NULL;
 }
+
 #endif

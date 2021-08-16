@@ -1,3 +1,4 @@
+#include "ansi_esc.h"
 #include "parse_options.h"
 #include "lex.h"
 #define _POSIX_C_SOURCE 1
@@ -58,15 +59,16 @@ static int
 strnc(const char * s, int c)
 {
     int n = 0;
+    if (!s) return 0;
     while (*s)
         if (*s++ == c)
             n++;
     return n;
 }
 
-#if 0
+#if 1
 static void
-remove_comments(char * buffer, size_t n)
+remove_comments(char * buffer)
 {
     /* strip comments */
     size_t i;
@@ -74,19 +76,19 @@ remove_comments(char * buffer, size_t n)
     int in_c_comment = 0;
     int in_cpp_comment = 0;
     char prev_char = '\0';
+    if (!buffer) return;
+    size_t n = strlen(buffer);
+    if (n < 1) return;
     for (i = 0; i < n-1; i++) {
-        //printf("%c", buffer[i]);
         if (in_cpp_comment) {
             if (buffer[i] == '\n') {
                 in_cpp_comment = 0;
-                //printf("(end c++ comment)");
             } else {
                 buffer[i] = ' ';
             }
         } else if (in_c_comment) {
             if (buffer[i] == '*' && buffer[i+1] == '/' && prev_char != '/') {
                 in_c_comment = 0;
-                //printf("(end c comment)");
                 buffer[i] = ' ';
                 buffer[i+1] = ' ';
             }
@@ -95,21 +97,16 @@ remove_comments(char * buffer, size_t n)
         } else if (in_string_literal) {
             if (buffer[i] == '"' && prev_char != '\\' && prev_char != '\'') {
                 in_string_literal = 0;
-                //printf("(end string literal)");
             }
-            //buffer[i] = '!';
         } else {
             if (buffer[i] == '"') {
                 in_string_literal = 1;
-                //printf("(start string literal)");
             } else if (buffer[i] == '/' && buffer[i+1] == '/') {
                 in_cpp_comment = 1;
-                //printf("(start c++ comment)");
                 buffer[i] = ' ';
                 buffer[i+1] = ' ';
             } else if (buffer[i] == '/' && buffer[i+1] == '*') {
                 in_c_comment = 1;
-                //printf("(start c comment)");
                 buffer[i] = ' ';
                 buffer[i+1] = ' ';
             }
@@ -119,11 +116,13 @@ remove_comments(char * buffer, size_t n)
 }
 #endif
 
+#if 0
 static void
 remove_comments(char * buffer)
 {
     lex_reset();
     int c;
+    if (!buffer) return;
     while ((c = *buffer)) {
         if (lex_next(c) == OUT_DELETE)
             if (*(buffer-1) != '\n' && *(buffer-1) != '\r')
@@ -131,6 +130,7 @@ remove_comments(char * buffer)
         buffer++;
     }
 }
+#endif
 
 static str_arr_t
 split_into_lines(char * s)
@@ -243,7 +243,6 @@ main
 
         buffer_t buffer = read_file(filename);
 
-        //remove_comments(buffer.p, buffer.n);
         remove_comments(buffer.p);
 
         str_arr_t sa = split_into_lines(buffer.p);
@@ -291,31 +290,172 @@ main
 }
 
 #ifdef TEST
+
+#include "minunit.h"
+
+char err_msg[MAX_ERR_MSG];
+int tests_run = 0;
+
+static char * test_strnc__empty_str_has_zero_of_any_char()
+{
+    mu_assert(strnc("", 'a') == 0, "an empty string has 0 of any character");
+    return NULL;
+}
+
+static char * test_strnc__null_ptr_returns_zero()
+{
+    mu_assert(strnc(NULL, 'a') == 0, "a null ptr string argument returns 0");
+    return NULL;
+}
+
+static char * test_strnc__str_with_none_of_sought_char_returns_0()
+{
+    mu_assert(strnc("Abcd", 'a') == 0, "string with none of sought char returns 0");
+    return NULL;
+}
+
+static char * test_strnc()
+{
+    mu_run_test(test_strnc__empty_str_has_zero_of_any_char);
+    mu_run_test(test_strnc__null_ptr_returns_zero);
+    mu_run_test(test_strnc__str_with_none_of_sought_char_returns_0);
+    return NULL;
+}
+
+static char * test_remove_comments__nothing_is_done_with_null_ptr()
+{
+    remove_comments(NULL);
+    mu_assert(1, "nothing is done with null ptr");
+    return NULL;
+}
+
+static char * test_remove_comments__an_empty_str_is_unchanged_when_comments_are_removed()
+{
+    char s[] = "";
+    remove_comments(s);
+    mu_assert(strcmp(s, "") == 0, "an empty string is unchanged when comments are removed");
+    return NULL;
+}
+
+static char * test_remove_comments__str_with_no_comments_is_unchanged()
+{
+    char s[] = "hello\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "hello\n") == 0, "a string with no comments is unchanged");
+    return NULL;
+}
+
+static char * test_remove_comments__c_comment_is_replaced_with_spaces()
+{
+    char s[] = "hello /* how are you */\nthis is the second line\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "hello                  \nthis is the second line\n") == 0, "c comment is replaced with spaces");
+    return NULL;
+}
+
+static char * test_remove_comments__cpp_comment_is_replaced_with_spaces()
+{
+    char s[] = "hello // how are you\nthis is the second line\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "hello               \nthis is the second line\n") == 0, "c++ comment is replaced with spaces");
+    return NULL;
+}
+
+static char * test_remove_comments__newlines_in_c_comments_are_not_removed()
+{
+    char s[] = "hello /* this comment\nspans multiple lines */\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "hello                \n                       \n") == 0, "newlines in c comments are not removed");
+    return NULL;
+}
+
+static char * test_remove_comments__c_comments_containing_cpp_comments_are_removed()
+{
+#define INPUT "a /* b\nc // d */e\n"
+    char input[] = INPUT;
+    char s[] = INPUT;
+    const char * correct = "a     \n         e\n";
+    remove_comments(s);
+    mu_assert_vaarg(strcmp(s, correct) == 0, "c comments containing c++ comments are removed; given:\n%s\nexpected:\n%s\nbut got:\n%s\n", input, correct, s);
+    return NULL;
+#undef INPUT
+}
+
+static char * test_remove_comments__cpp_comments_containing_c_comments_are_removed()
+{
+    char s[] = "a// b /* c */ d\ne\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "a              \ne\n") == 0, "c++ comments containing c comments are removed");
+    return NULL;
+}
+
+static char * test_remove_comments__c_comments_in_str_literals_are_not_removed()
+{
+    char s[] = "a\"b/*c*/d\"e\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "a\"b/*c*/d\"e\n") == 0, "c comments in str literals are not removed");
+    return NULL;
+}
+
+static char * test_remove_comments__edge_cases()
+{
+    char s[] = "a / / b */ c /**/ d /***/ e /*/ f */ g\n";
+    remove_comments(s);
+    mu_assert(strcmp(s, "a / / b */ c      d       e          g\n") == 0, "edge cases");
+    return NULL;
+}
+
+static char * test_remove_comments()
+{
+    mu_run_test(test_remove_comments__nothing_is_done_with_null_ptr);
+    mu_run_test(test_remove_comments__an_empty_str_is_unchanged_when_comments_are_removed);
+    mu_run_test(test_remove_comments__str_with_no_comments_is_unchanged);
+    mu_run_test(test_remove_comments__c_comment_is_replaced_with_spaces);
+    mu_run_test(test_remove_comments__cpp_comment_is_replaced_with_spaces);
+    mu_run_test(test_remove_comments__newlines_in_c_comments_are_not_removed);
+    mu_run_test(test_remove_comments__c_comments_containing_cpp_comments_are_removed);
+    mu_run_test(test_remove_comments__cpp_comments_containing_c_comments_are_removed);
+    mu_run_test(test_remove_comments__c_comments_in_str_literals_are_not_removed);
+    mu_run_test(test_remove_comments__edge_cases);
+    // TODO:
+    //   c++ comments in string literals are not removed
+    //   comments may contain escape sequences
+    //   c comments don't nest
+    //   various newline conventions are handled
+    return NULL;
+}
+
+static char * all_tests()
+{
+    mu_run_test_suite(test_parse_options);
+    mu_run_test_suite(test_strnc);
+    mu_run_test_suite(test_remove_comments);
+    return NULL;
+}
+
 int main()
 {
-#if 1
+
+    char * test_results = all_tests();
+
+    if (test_results != NULL) {
+        if (isatty(STDOUT_FILENO)) ansi_set(2, ANSI_BOLD, ANSI_FG_RED);
+        printf("Test failed: %s\n", test_results);
+        if (isatty(STDOUT_FILENO)) ansi_reset();
+    } else {
+        if (isatty(STDOUT_FILENO)) ansi_set(2, ANSI_BOLD, ANSI_FG_GREEN);
+        printf("All tests passed! (%d total)\n", tests_run);
+        if (isatty(STDOUT_FILENO)) ansi_reset();
+    }
+
+    // TODO: whole-program tests
+
+#if 0
     char * argv[] = { "./build/sloc", "./src/main.c", "--source", NULL };
     int argc = NELEM(argv)-1;
     test_main(argc, argv);
-#else
-    char * argv[] = { "./build/sloc", "./src/main.c", "--source", "5", NULL };
-    int argc = NELEM(argv)-1;
-    char ** non_option_args;
-    size_t num_non_option_args;
-    option_t options[] = {
-        {"help",    'h',  "show this help",             ARG_NONE,       ARG_TYPE_FLAG, &help_flag     },
-        {"version", ' ',  "version number",             ARG_NONE,       ARG_TYPE_FLAG, &version_flag  },
-        {"total",   't',  "total number of lines",      ARG_NONE,       ARG_TYPE_FLAG, &total_flag    },
-        {"blank",   'b',  "number of blank lines",      ARG_NONE,       ARG_TYPE_FLAG, &blank_flag    },
-        {"comment", 'c',  "number of comment lines",    ARG_NONE,       ARG_TYPE_FLAG, &comment_flag  },
-        {"source",  's',  "number of source lines",     ARG_REQUIRED,   ARG_TYPE_INT,  &source_flag   },
-    };
-    const size_t num_options = NELEM(options);
-    options_str = gen_options_str(options, num_options);
-    parse_options(argc, argv, options, num_options, &non_option_args, &num_non_option_args);
 #endif
 
-    test_parse_options();
-
+    return 0;
 }
 #endif
