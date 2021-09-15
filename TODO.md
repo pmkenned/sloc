@@ -1,6 +1,7 @@
 # TODO
 
 - Documentation
+- Verify that [escape sequences](https://en.cppreference.com/w/c/language/escape) are handled properly
 - Automatically create FSM from table
 - Add testing code
 - Other forms of static analysis

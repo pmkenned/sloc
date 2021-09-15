@@ -163,6 +163,8 @@ lex_next(int input)
             else if (input == '\n') { next_state = ST_ERR ; output = 0; }
             else                    { next_state = ST_ERR ; output = 0; }
             break;
+        default:
+            assert(0);
             break;
     }
 

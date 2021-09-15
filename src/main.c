@@ -1,7 +1,7 @@
+#define _POSIX_C_SOURCE 1
 #include "ansi_esc.h"
 #include "parse_options.h"
 #include "lex.h"
-#define _POSIX_C_SOURCE 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
