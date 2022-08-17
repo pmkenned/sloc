@@ -35,6 +35,10 @@ F8: debug
 
 all: $(BUILD_DIR)/$(TARGET)
 
+fuzz:
+	afl-gcc -m32 -fsanitize=address,undefined -g src/*.c
+	afl-fuzz -m800 -i src -o out -- ./a.out @@
+
 # FILES=`find src -name "*.c" -printf '%p '` make profile
 FILES ?= $(shell find $(SRC_DIR) -type f -name '*.c')
 

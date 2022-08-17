@@ -283,8 +283,8 @@ main
         printf("\n");
     }
 
-    //free(non_option_args);
-    //free(options_str);
+    free(non_option_args);
+    free(options_str);
 
     return 0;
 }
